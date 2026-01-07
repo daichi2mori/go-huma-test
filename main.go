@@ -11,35 +11,22 @@ import (
 	"net/http"
 	"os"
 
+	_ "embed"
+
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:embed schema/schema.sql
+var schema string
+
 func initDB(dbPath string) (*sql.DB, error) {
 	sqlDB, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-
-	schema := `
-	CREATE TABLE IF NOT EXISTS todos (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		title TEXT NOT NULL,
-		description TEXT,
-		completed INTEGER NOT NULL DEFAULT 0,
-		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-	);
-
-	CREATE TRIGGER IF NOT EXISTS update_todos_updated_at
-		AFTER UPDATE ON todos
-		FOR EACH ROW
-	BEGIN
-		UPDATE todos SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
-	END;
-	`
 
 	if _, err := sqlDB.Exec(schema); err != nil {
 		return nil, fmt.Errorf("failed to create schema: %w", err)
