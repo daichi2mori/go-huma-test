@@ -28,6 +28,20 @@ func initDB(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	params := []string{
+		"PRAGMA busy_timeout = 5000;", // ロックされている場合最大5秒待つ
+		"PRAGMA journal_mode = WAL;",  // 読み取りは複数同時に可能だが書き込みは１つだけ。SQLiteをWebAPIで使用する場合はほぼ必須
+		"PRAGMA foreign_keys = ON;",   // 外部キー制約を有効化（将来のために）
+	}
+	for _, p := range params {
+		if _, err := sqlDB.Exec(p); err != nil {
+			return nil, err
+		}
+	}
+
+	sqlDB.SetMaxOpenConns(1) // 同時に開ける最大コネクション数
+	sqlDB.SetMaxIdleConns(1) // アイドル状態のコネクション数
+
 	if _, err := sqlDB.Exec(schema); err != nil {
 		return nil, fmt.Errorf("failed to create schema: %w", err)
 	}
