@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"go-huma-test/db"
@@ -57,7 +58,11 @@ func main() {
 	}
 	defer sqlDB.Close()
 
-	queries := db.New(sqlDB)
+	queries, err := db.Prepare(context.Background(), sqlDB)
+	if err != nil {
+		slog.Error("failed to prepare database", "err", err)
+		os.Exit(1)
+	}
 	handler := handler.NewTodoHandler(queries)
 
 	cli := humacli.New(func(h humacli.Hooks, o *model.Options) {

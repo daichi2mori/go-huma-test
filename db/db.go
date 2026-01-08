@@ -7,6 +7,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 type DBTX interface {
@@ -20,12 +21,128 @@ func New(db DBTX) *Queries {
 	return &Queries{db: db}
 }
 
+func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
+	q := Queries{db: db}
+	var err error
+	if q.createTodoStmt, err = db.PrepareContext(ctx, createTodo); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateTodo: %w", err)
+	}
+	if q.deleteTodoStmt, err = db.PrepareContext(ctx, deleteTodo); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteTodo: %w", err)
+	}
+	if q.getTodoStmt, err = db.PrepareContext(ctx, getTodo); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTodo: %w", err)
+	}
+	if q.listTodosStmt, err = db.PrepareContext(ctx, listTodos); err != nil {
+		return nil, fmt.Errorf("error preparing query ListTodos: %w", err)
+	}
+	if q.listTodosByStatusStmt, err = db.PrepareContext(ctx, listTodosByStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query ListTodosByStatus: %w", err)
+	}
+	if q.toggleTodoCompletedStmt, err = db.PrepareContext(ctx, toggleTodoCompleted); err != nil {
+		return nil, fmt.Errorf("error preparing query ToggleTodoCompleted: %w", err)
+	}
+	if q.updateTodoStmt, err = db.PrepareContext(ctx, updateTodo); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateTodo: %w", err)
+	}
+	return &q, nil
+}
+
+func (q *Queries) Close() error {
+	var err error
+	if q.createTodoStmt != nil {
+		if cerr := q.createTodoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createTodoStmt: %w", cerr)
+		}
+	}
+	if q.deleteTodoStmt != nil {
+		if cerr := q.deleteTodoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteTodoStmt: %w", cerr)
+		}
+	}
+	if q.getTodoStmt != nil {
+		if cerr := q.getTodoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTodoStmt: %w", cerr)
+		}
+	}
+	if q.listTodosStmt != nil {
+		if cerr := q.listTodosStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listTodosStmt: %w", cerr)
+		}
+	}
+	if q.listTodosByStatusStmt != nil {
+		if cerr := q.listTodosByStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listTodosByStatusStmt: %w", cerr)
+		}
+	}
+	if q.toggleTodoCompletedStmt != nil {
+		if cerr := q.toggleTodoCompletedStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing toggleTodoCompletedStmt: %w", cerr)
+		}
+	}
+	if q.updateTodoStmt != nil {
+		if cerr := q.updateTodoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateTodoStmt: %w", cerr)
+		}
+	}
+	return err
+}
+
+func (q *Queries) exec(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) (sql.Result, error) {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).ExecContext(ctx, args...)
+	case stmt != nil:
+		return stmt.ExecContext(ctx, args...)
+	default:
+		return q.db.ExecContext(ctx, query, args...)
+	}
+}
+
+func (q *Queries) query(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) (*sql.Rows, error) {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).QueryContext(ctx, args...)
+	case stmt != nil:
+		return stmt.QueryContext(ctx, args...)
+	default:
+		return q.db.QueryContext(ctx, query, args...)
+	}
+}
+
+func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) *sql.Row {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).QueryRowContext(ctx, args...)
+	case stmt != nil:
+		return stmt.QueryRowContext(ctx, args...)
+	default:
+		return q.db.QueryRowContext(ctx, query, args...)
+	}
+}
+
 type Queries struct {
-	db DBTX
+	db                      DBTX
+	tx                      *sql.Tx
+	createTodoStmt          *sql.Stmt
+	deleteTodoStmt          *sql.Stmt
+	getTodoStmt             *sql.Stmt
+	listTodosStmt           *sql.Stmt
+	listTodosByStatusStmt   *sql.Stmt
+	toggleTodoCompletedStmt *sql.Stmt
+	updateTodoStmt          *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db: tx,
+		db:                      tx,
+		tx:                      tx,
+		createTodoStmt:          q.createTodoStmt,
+		deleteTodoStmt:          q.deleteTodoStmt,
+		getTodoStmt:             q.getTodoStmt,
+		listTodosStmt:           q.listTodosStmt,
+		listTodosByStatusStmt:   q.listTodosByStatusStmt,
+		toggleTodoCompletedStmt: q.toggleTodoCompletedStmt,
+		updateTodoStmt:          q.updateTodoStmt,
 	}
 }

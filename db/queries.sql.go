@@ -23,7 +23,7 @@ type CreateTodoParams struct {
 }
 
 func (q *Queries) CreateTodo(ctx context.Context, arg CreateTodoParams) (Todo, error) {
-	row := q.db.QueryRowContext(ctx, createTodo, arg.Title, arg.Description, arg.Completed)
+	row := q.queryRow(ctx, q.createTodoStmt, createTodo, arg.Title, arg.Description, arg.Completed)
 	var i Todo
 	err := row.Scan(
 		&i.ID,
@@ -41,7 +41,7 @@ DELETE FROM todos WHERE id = ?
 `
 
 func (q *Queries) DeleteTodo(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteTodo, id)
+	_, err := q.exec(ctx, q.deleteTodoStmt, deleteTodo, id)
 	return err
 }
 
@@ -52,7 +52,7 @@ WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetTodo(ctx context.Context, id int64) (Todo, error) {
-	row := q.db.QueryRowContext(ctx, getTodo, id)
+	row := q.queryRow(ctx, q.getTodoStmt, getTodo, id)
 	var i Todo
 	err := row.Scan(
 		&i.ID,
@@ -72,7 +72,7 @@ ORDER BY created_at DESC
 `
 
 func (q *Queries) ListTodos(ctx context.Context) ([]Todo, error) {
-	rows, err := q.db.QueryContext(ctx, listTodos)
+	rows, err := q.query(ctx, q.listTodosStmt, listTodos)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ ORDER BY created_at DESC
 `
 
 func (q *Queries) ListTodosByStatus(ctx context.Context, completed int64) ([]Todo, error) {
-	rows, err := q.db.QueryContext(ctx, listTodosByStatus, completed)
+	rows, err := q.query(ctx, q.listTodosByStatusStmt, listTodosByStatus, completed)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ RETURNING id, title, description, completed, created_at, updated_at
 `
 
 func (q *Queries) ToggleTodoCompleted(ctx context.Context, id int64) (Todo, error) {
-	row := q.db.QueryRowContext(ctx, toggleTodoCompleted, id)
+	row := q.queryRow(ctx, q.toggleTodoCompletedStmt, toggleTodoCompleted, id)
 	var i Todo
 	err := row.Scan(
 		&i.ID,
@@ -174,7 +174,7 @@ type UpdateTodoParams struct {
 }
 
 func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error) {
-	row := q.db.QueryRowContext(ctx, updateTodo,
+	row := q.queryRow(ctx, q.updateTodoStmt, updateTodo,
 		arg.Title,
 		arg.Description,
 		arg.Completed,
