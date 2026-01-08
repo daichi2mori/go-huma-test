@@ -1,2 +1,4 @@
 tmp
 todos.db
+*shm
+*wal
