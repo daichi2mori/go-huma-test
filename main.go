@@ -70,6 +70,7 @@ func main() {
 
 		config := huma.DefaultConfig("Todo API", "1.0.0")
 		config.Info.Description = "SQLite + sqlc + Humaを使ったシンプルなTodo API"
+		config.CreateHooks = []func(huma.Config) huma.Config{}
 		api := humago.New(mux, config)
 
 		huma.Register(api, huma.Operation{
