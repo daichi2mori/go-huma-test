@@ -63,7 +63,7 @@ func main() {
 		slog.Error("failed to prepare database", "err", err)
 		os.Exit(1)
 	}
-	handler := handler.NewTodoHandler(queries)
+	handler := handler.NewTodoHandler(queries, sqlDB)
 
 	cli := humacli.New(func(h humacli.Hooks, o *model.Options) {
 		mux := http.NewServeMux()

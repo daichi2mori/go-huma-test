@@ -13,10 +13,14 @@ import (
 
 type TodoHandler struct {
 	queries *db.Queries
+	db      *sql.DB
 }
 
-func NewTodoHandler(queries *db.Queries) *TodoHandler {
-	return &TodoHandler{queries: queries}
+func NewTodoHandler(queries *db.Queries, db *sql.DB) *TodoHandler {
+	return &TodoHandler{
+		queries: queries,
+		db:      db,
+	}
 }
 
 func stringToNullString(s string) sql.NullString {
@@ -100,14 +104,13 @@ func (h *TodoHandler) CreateTodo(ctx context.Context, input *model.CreateTodoInp
 }
 
 func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInput) (*model.UpdateTodoOutput, error) {
-	// 存在確認
-	_, err := h.queries.GetTodo(ctx, input.ID)
+	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, huma.Error404NotFound(fmt.Sprintf("Todo with ID %d not found", input.ID))
-		}
-		return nil, huma.Error500InternalServerError("Failed to fetch todo", err)
+		return nil, huma.Error500InternalServerError("Failed to begin transaction", err)
 	}
+	defer tx.Rollback()
+
+	qtx := h.queries.WithTx(tx)
 
 	var completed int64
 	if input.Body.Completed {
@@ -116,7 +119,7 @@ func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInp
 
 	description := stringToNullString(*input.Body.Description)
 
-	todo, err := h.queries.UpdateTodo(ctx, db.UpdateTodoParams{
+	todo, err := qtx.UpdateTodo(ctx, db.UpdateTodoParams{
 		ID:          input.ID,
 		Title:       input.Body.Title,
 		Description: description,
@@ -126,22 +129,28 @@ func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInp
 		return nil, huma.Error500InternalServerError("Failed to update todo", err)
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, huma.Error500InternalServerError("Failed to commit transaction", err)
+	}
+
 	return &model.UpdateTodoOutput{Body: toTodoResponse(todo)}, nil
 }
 
 func (h *TodoHandler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInput) (*model.DeleteTodoOutput, error) {
-	// 存在確認
-	_, err := h.queries.GetTodo(ctx, input.ID)
+	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, huma.Error404NotFound(fmt.Sprintf("Todo with ID %d not found", input.ID))
-		}
-		return nil, huma.Error500InternalServerError("Failed to fetch todo", err)
+		return nil, huma.Error500InternalServerError("Failed to begin transaction", err)
+	}
+	defer tx.Rollback()
+
+	qtx := h.queries.WithTx(tx)
+
+	if err := qtx.DeleteTodo(ctx, input.ID); err != nil {
+		return nil, huma.Error500InternalServerError("Failed to delete todo", err)
 	}
 
-	err = h.queries.DeleteTodo(ctx, input.ID)
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to delete todo", err)
+	if err := tx.Commit(); err != nil {
+		return nil, huma.Error500InternalServerError("Failed to commit transaction", err)
 	}
 
 	output := &model.DeleteTodoOutput{}
@@ -150,18 +159,21 @@ func (h *TodoHandler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInp
 }
 
 func (h *TodoHandler) ToggleTodo(ctx context.Context, input *model.ToggleTodoInput) (*model.ToggleTodoOutput, error) {
-	// 存在確認
-	_, err := h.queries.GetTodo(ctx, input.ID)
+	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, huma.Error404NotFound(fmt.Sprintf("Todo with ID %d not found", input.ID))
-		}
-		return nil, huma.Error500InternalServerError("Failed to fetch todo", err)
+		return nil, huma.Error500InternalServerError("Failed to begin transaction", err)
 	}
+	defer tx.Rollback()
 
-	todo, err := h.queries.ToggleTodoCompleted(ctx, input.ID)
+	qtx := h.queries.WithTx(tx)
+
+	todo, err := qtx.ToggleTodoCompleted(ctx, input.ID)
 	if err != nil {
 		return nil, huma.Error500InternalServerError("Failed to toggle todo", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, huma.Error500InternalServerError("Failed to commit transaction", err)
 	}
 
 	return &model.ToggleTodoOutput{Body: toTodoResponse(todo)}, nil
