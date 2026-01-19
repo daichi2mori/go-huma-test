@@ -1,0 +1,9 @@
+[env]
+TITLE = "My App"
+VERSION = "1.0.0"
+DESCRIPTION = "Sample application"
+
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 8080
+
+DB_PATH = "./todos.db"

@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"go-huma-test/config"
 	"go-huma-test/db"
 	"go-huma-test/handler"
 	"go-huma-test/model"
@@ -81,7 +82,21 @@ func main() {
 		AddSource: false,
 	})))
 
-	sqlDB, err := initDB("./todos.db")
+	// 設定の読み込み
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("設定の読み込みに失敗", "err", err)
+		os.Exit(1)
+	}
+
+	slog.Info("設定を読み込みました",
+		"host", cfg.Server.Host,
+		"port", cfg.Server.Port,
+		"db_path", cfg.Database.Path,
+	)
+
+	// マイグレーション
+	sqlDB, err := initDB(cfg.Database.Path)
 	if err != nil {
 		slog.Error("データベース初期化に失敗", "err", err)
 		os.Exit(1)
@@ -102,8 +117,8 @@ func main() {
 	cli := humacli.New(func(h humacli.Hooks, o *model.Options) {
 		mux := http.NewServeMux()
 
-		config := huma.DefaultConfig("Todo API", "1.0.0")
-		config.Info.Description = "SQLite + sqlc + Humaを使ったシンプルなTodo API"
+		config := huma.DefaultConfig(cfg.Title, cfg.Version)
+		config.Info.Description = cfg.Description
 		config.CreateHooks = []func(huma.Config) huma.Config{}
 		api := humago.New(mux, config)
 
@@ -167,7 +182,7 @@ func main() {
 		}, handler.ToggleTodo)
 
 		srv := &http.Server{
-			Addr:              fmt.Sprintf("%s:%d", o.Host, o.Port),
+			Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 			Handler:           mux,
 			ReadHeaderTimeout: 5 * time.Second,  // ヘッダ読み取り制限
 			ReadTimeout:       15 * time.Second, // 全体の読み取り制限
@@ -177,7 +192,7 @@ func main() {
 
 		h.OnStart(func() {
 			slog.Info("サーバー起動開始...")
-			addr := fmt.Sprintf("%s:%d", o.Host, o.Port)
+			addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 			fmt.Printf("🚀 Todo API Server starting on http://%s\n", addr)
 			fmt.Printf("📚 API Documentation: http://%s/docs\n", addr)
 			fmt.Printf("📚 Get OpenAPI File: http://%s/openapi.yaml\n", addr)
