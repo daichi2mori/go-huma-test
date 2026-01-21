@@ -121,6 +121,14 @@ func (h *TodoHandler) CreateTodo(ctx context.Context, input *model.CreateTodoInp
 
 // UpdateTodo は指定されたIDのTodoを更新する
 func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInput) (*model.UpdateTodoOutput, error) {
+	_, err := h.queries.GetTodo(ctx, input.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, huma.Error404NotFound(fmt.Sprintf("IDが見つかりませんでした: %d", input.ID))
+		}
+		return nil, huma.Error500InternalServerError("Todoの取得に失敗", err)
+	}
+
 	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
 		slog.Warn("トランザクション開始に失敗", "err", err)
@@ -160,6 +168,14 @@ func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInp
 
 // DeleteTodo は指定されたIDのTodoを削除する
 func (h *TodoHandler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInput) (*model.DeleteTodoOutput, error) {
+	_, err := h.queries.GetTodo(ctx, input.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, huma.Error404NotFound(fmt.Sprintf("IDが見つかりませんでした: %d", input.ID))
+		}
+		return nil, huma.Error500InternalServerError("Todoの取得に失敗", err)
+	}
+
 	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
 		slog.Warn("トランザクション開始に失敗", "err", err)
@@ -188,6 +204,14 @@ func (h *TodoHandler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInp
 
 // ToggleTodo は指定されたIDのTodoの完了状態を切り替える
 func (h *TodoHandler) ToggleTodo(ctx context.Context, input *model.ToggleTodoInput) (*model.ToggleTodoOutput, error) {
+	_, err := h.queries.GetTodo(ctx, input.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, huma.Error404NotFound(fmt.Sprintf("IDが見つかりませんでした: %d", input.ID))
+		}
+		return nil, huma.Error500InternalServerError("Todoの取得に失敗", err)
+	}
+
 	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
 		slog.Warn("トランザクション開始に失敗", "err", err)
