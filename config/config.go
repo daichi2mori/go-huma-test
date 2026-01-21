@@ -29,18 +29,8 @@ type DatabaseConfig struct {
 	Path string `env:"PATH"`
 }
 
-// Load は指定されたパスからYAML設定ファイルを読み込む
+// Load は環境変数から設定値を取得
 func Load() (*Config, error) {
-	// data, err := os.ReadFile(path)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("設定ファイルの読み込みに失敗: %w", err)
-	// }
-
-	// var cfg Config
-	// if err := yaml.Unmarshal(data, &cfg); err != nil {
-	// 	return nil, fmt.Errorf("設定ファイルのパースに失敗: %w", err)
-	// }
-
 	cfg, err := env.ParseAs[Config]()
 	if err != nil {
 		return nil, fmt.Errorf("環境変数のパースに失敗: %w", err)
