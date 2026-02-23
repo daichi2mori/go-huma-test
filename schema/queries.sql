@@ -21,7 +21,7 @@ RETURNING id, title, description, completed, created_at, updated_at;
 
 -- name: UpdateTodo :one
 UPDATE todos
-SET title = ?, description = ?, completed = ?, updated_at = CURRENT_TIMESTAMP
+SET title = ?, description = ?, completed = ?
 WHERE id = ?
 RETURNING id, title, description, completed, created_at, updated_at;
 
@@ -30,6 +30,6 @@ DELETE FROM todos WHERE id = ?;
 
 -- name: ToggleTodoCompleted :one
 UPDATE todos
-SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, updated_at = CURRENT_TIMESTAMP
+SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END
 WHERE id = ?
 RETURNING id, title, description, completed, created_at, updated_at;
