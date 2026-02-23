@@ -16,16 +16,13 @@ import (
 	"os"
 	"time"
 
-	_ "embed"
+	dbpkg "go-huma-test/db"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-//go:embed db/schema.sql
-var schema string
 
 func initDB(dbPath string) (*sql.DB, error) {
 	sqlDB, err := sql.Open("sqlite3", dbPath)
@@ -47,7 +44,7 @@ func initDB(dbPath string) (*sql.DB, error) {
 	sqlDB.SetMaxOpenConns(1) // 同時に開ける最大コネクション数
 	sqlDB.SetMaxIdleConns(1) // アイドル状態のコネクション数
 
-	if _, err := sqlDB.Exec(schema); err != nil {
+	if _, err := sqlDB.Exec(dbpkg.Schema); err != nil {
 		return nil, fmt.Errorf("データベース初期化スキーマの実行失敗: %w", err)
 	}
 
