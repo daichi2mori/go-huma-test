@@ -8,7 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"go-huma-test/config"
-	"go-huma-test/db"
+	dbsqlc "go-huma-test/db/sqlc"
 	"go-huma-test/handler"
 	"go-huma-test/model"
 	"log/slog"
@@ -24,7 +24,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:embed schema/schema.sql
+//go:embed db/schema.sql
 var schema string
 
 func initDB(dbPath string) (*sql.DB, error) {
@@ -107,7 +107,7 @@ func main() {
 		}
 	}()
 
-	queries, err := db.Prepare(context.Background(), sqlDB)
+	queries, err := dbsqlc.Prepare(context.Background(), sqlDB)
 	if err != nil {
 		slog.Error("データベースのPrepareに失敗", "err", err)
 		os.Exit(1)

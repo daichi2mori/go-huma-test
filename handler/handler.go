@@ -7,7 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go-huma-test/db"
+	dbsqlc "go-huma-test/db/sqlc"
 	"go-huma-test/model"
 	"log/slog"
 	"time"
@@ -17,12 +17,12 @@ import (
 
 // TodoHandler はTodoに関する操作を処理するハンドラー
 type TodoHandler struct {
-	queries *db.Queries
+	queries *dbsqlc.Queries
 	db      *sql.DB
 }
 
 // NewTodoHandler はTodoHandlerの新しいインスタンスを生成する
-func NewTodoHandler(queries *db.Queries, db *sql.DB) *TodoHandler {
+func NewTodoHandler(queries *dbsqlc.Queries, db *sql.DB) *TodoHandler {
 	return &TodoHandler{
 		queries: queries,
 		db:      db,
@@ -49,7 +49,7 @@ func nullStringToString(s sql.NullString) string {
 }
 
 // toTodoResponse はdb.Todoをmodel.TodoResponseに変換する
-func toTodoResponse(t db.Todo) model.TodoResponse {
+func toTodoResponse(t dbsqlc.Todo) model.TodoResponse {
 	description := nullStringToString(t.Description)
 
 	return model.TodoResponse{
@@ -64,7 +64,7 @@ func toTodoResponse(t db.Todo) model.TodoResponse {
 
 // ListTodos はTodoのリストを取得する
 func (h *TodoHandler) ListTodos(ctx context.Context, input *model.ListTodosInput) (*model.ListTodosOutput, error) {
-	var todos []db.Todo
+	var todos []dbsqlc.Todo
 	var err error
 
 	if input.Completed {
@@ -106,7 +106,7 @@ func (h *TodoHandler) GetTodo(ctx context.Context, input *model.GetTodoInput) (*
 func (h *TodoHandler) CreateTodo(ctx context.Context, input *model.CreateTodoInput) (*model.CreateTodoOutput, error) {
 	description := ptrStringToNullString(input.Body.Description)
 
-	todo, err := h.queries.CreateTodo(ctx, db.CreateTodoParams{
+	todo, err := h.queries.CreateTodo(ctx, dbsqlc.CreateTodoParams{
 		Title:       input.Body.Title,
 		Description: description,
 		Completed:   0,
@@ -147,7 +147,7 @@ func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInp
 
 	description := ptrStringToNullString(input.Body.Description)
 
-	todo, err := qtx.UpdateTodo(ctx, db.UpdateTodoParams{
+	todo, err := qtx.UpdateTodo(ctx, dbsqlc.UpdateTodoParams{
 		ID:          input.ID,
 		Title:       input.Body.Title,
 		Description: description,
