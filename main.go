@@ -8,19 +8,20 @@ import (
 	"database/sql"
 	"fmt"
 	"go-huma-test/config"
-	dbsqlc "go-huma-test/db/sqlc"
 	"go-huma-test/handler"
-	"go-huma-test/model"
+	"go-huma-test/repository"
+	"go-huma-test/usecase"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	dbpkg "go-huma-test/db"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
-	"github.com/danielgtaylor/huma/v2/humacli"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -104,116 +105,49 @@ func main() {
 		}
 	}()
 
-	queries, err := dbsqlc.Prepare(context.Background(), sqlDB)
-	if err != nil {
-		slog.Error("データベースのPrepareに失敗", "err", err)
+	// DI
+	todoRepo := repository.NewTodoRepository(sqlDB)
+	todoUC := usecase.NewTodoUseCase(todoRepo)
+	todoHandler := handler.NewTodoHandler(todoUC)
+
+	mux := http.NewServeMux()
+	humaCfg := huma.DefaultConfig(cfg.Title, cfg.Version)
+	humaCfg.Info.Description = cfg.Description
+	humaCfg.CreateHooks = []func(huma.Config) huma.Config{}
+	api := humago.New(mux, humaCfg)
+	todoHandler.RegisterRoutes(api)
+
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,  // ヘッダ読み取り制限
+		ReadTimeout:       15 * time.Second, // 全体の読み取り制限
+		WriteTimeout:      15 * time.Second, // レスポンス書き込み制限
+		IdleTimeout:       60 * time.Second, // keep-alive制御
+	}
+
+	go func() {
+		fmt.Printf("🚀 Todo API Server starting on http://%s\n", addr)
+		fmt.Printf("📚 API Documentation: http://%s/docs\n", addr)
+		fmt.Printf("📚 Get OpenAPI File: http://%s/openapi.yaml\n", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("サーバー起動に失敗", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("サーバーのシャットダウンに失敗", "err", err)
 		os.Exit(1)
 	}
-	handler := handler.NewTodoHandler(queries, sqlDB)
-
-	cli := humacli.New(func(h humacli.Hooks, o *model.Options) {
-		mux := http.NewServeMux()
-
-		config := huma.DefaultConfig(cfg.Title, cfg.Version)
-		config.Info.Description = cfg.Description
-		config.CreateHooks = []func(huma.Config) huma.Config{}
-		api := humago.New(mux, config)
-
-		// ミドルウェア設定
-		api.UseMiddleware(LoggingMiddleware)
-		api.UseMiddleware(AuthMiddleware)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "list-todos",
-			Method:      http.MethodGet,
-			Path:        "/todos",
-			Summary:     "Todo一覧取得",
-			Description: "すべてのTodoを取得",
-			Tags:        []string{"todos"},
-		}, handler.ListTodos)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "get-todo",
-			Method:      http.MethodGet,
-			Path:        "/todos/{id}",
-			Summary:     "Todo取得",
-			Description: "指定したIDのTodoを取得します。",
-			Tags:        []string{"todos"},
-		}, handler.GetTodo)
-
-		huma.Register(api, huma.Operation{
-			OperationID:   "create-todo",
-			Method:        http.MethodPost,
-			Path:          "/todos",
-			Summary:       "Todo作成",
-			Description:   "新しいTodoを作成します。",
-			Tags:          []string{"todos"},
-			DefaultStatus: http.StatusCreated,
-		}, handler.CreateTodo)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "update-todo",
-			Method:      http.MethodPut,
-			Path:        "/todos/{id}",
-			Summary:     "Todo更新",
-			Description: "指定したIDのTodoを更新します。",
-			Tags:        []string{"todos"},
-		}, handler.UpdateTodo)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "delete-todo",
-			Method:      http.MethodDelete,
-			Path:        "/todos/{id}",
-			Summary:     "Todo削除",
-			Description: "指定したIDのTodoを削除します。",
-			Tags:        []string{"todos"},
-		}, handler.DeleteTodo)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "toggle-todo",
-			Method:      http.MethodPost,
-			Path:        "/todos/{id}/toggle",
-			Summary:     "Todo完了状態切り替え",
-			Description: "指定したIDのTodoの完了状態を切り替えます。",
-			Tags:        []string{"todos"},
-		}, handler.ToggleTodo)
-
-		srv := &http.Server{
-			Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-			Handler:           mux,
-			ReadHeaderTimeout: 5 * time.Second,  // ヘッダ読み取り制限
-			ReadTimeout:       15 * time.Second, // 全体の読み取り制限
-			WriteTimeout:      15 * time.Second, // レスポンス書き込み制限
-			IdleTimeout:       60 * time.Second, // keep-alive制御
-		}
-
-		h.OnStart(func() {
-			slog.Info("サーバー起動開始...")
-			addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-			fmt.Printf("🚀 Todo API Server starting on http://%s\n", addr)
-			fmt.Printf("📚 API Documentation: http://%s/docs\n", addr)
-			fmt.Printf("📚 Get OpenAPI File: http://%s/openapi.yaml\n", addr)
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				slog.Error("サーバー起動に失敗", "err", err)
-				os.Exit(1)
-			}
-		})
-
-		h.OnStop(func() {
-			slog.Info("Shutting down server...")
-			slog.Info("サーバーのシャットダウン開始...")
-
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-			defer cancel()
-
-			if err := srv.Shutdown(ctx); err != nil {
-				slog.Error("サーバーのシャットダウンに失敗", "err", err)
-				os.Exit(1)
-			}
-
-			slog.Info("サーバーは正常にシャットダウンされました")
-		})
-	})
-
-	cli.Run()
+	slog.Info("サーバーは正常にシャットダウンされました")
 }

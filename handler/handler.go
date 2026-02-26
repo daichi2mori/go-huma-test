@@ -15,15 +15,15 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// TodoHandler はTodoに関する操作を処理するハンドラー
-type TodoHandler struct {
+// Handler はTodoに関する操作を処理するハンドラー
+type Handler struct {
 	queries *dbsqlc.Queries
 	db      *sql.DB
 }
 
-// NewTodoHandler はTodoHandlerの新しいインスタンスを生成する
-func NewTodoHandler(queries *dbsqlc.Queries, db *sql.DB) *TodoHandler {
-	return &TodoHandler{
+// NewHandler はHandlerの新しいインスタンスを生成する
+func NewHandler(queries *dbsqlc.Queries, db *sql.DB) *Handler {
+	return &Handler{
 		queries: queries,
 		db:      db,
 	}
@@ -63,7 +63,7 @@ func toTodoResponse(t dbsqlc.Todo) model.TodoResponse {
 }
 
 // ListTodos はTodoのリストを取得する
-func (h *TodoHandler) ListTodos(ctx context.Context, input *model.ListTodosInput) (*model.ListTodosOutput, error) {
+func (h *Handler) ListTodos(ctx context.Context, input *model.ListTodosInput) (*model.ListTodosOutput, error) {
 	var todos []dbsqlc.Todo
 	var err error
 
@@ -88,7 +88,7 @@ func (h *TodoHandler) ListTodos(ctx context.Context, input *model.ListTodosInput
 }
 
 // GetTodo は指定されたIDのTodoを取得する
-func (h *TodoHandler) GetTodo(ctx context.Context, input *model.GetTodoInput) (*model.GetTodoOutput, error) {
+func (h *Handler) GetTodo(ctx context.Context, input *model.GetTodoInput) (*model.GetTodoOutput, error) {
 	todo, err := h.queries.GetTodo(ctx, input.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -103,7 +103,7 @@ func (h *TodoHandler) GetTodo(ctx context.Context, input *model.GetTodoInput) (*
 }
 
 // CreateTodo は新しいTodoを作成する
-func (h *TodoHandler) CreateTodo(ctx context.Context, input *model.CreateTodoInput) (*model.CreateTodoOutput, error) {
+func (h *Handler) CreateTodo(ctx context.Context, input *model.CreateTodoInput) (*model.CreateTodoOutput, error) {
 	description := ptrStringToNullString(input.Body.Description)
 
 	todo, err := h.queries.CreateTodo(ctx, dbsqlc.CreateTodoParams{
@@ -120,7 +120,7 @@ func (h *TodoHandler) CreateTodo(ctx context.Context, input *model.CreateTodoInp
 }
 
 // UpdateTodo は指定されたIDのTodoを更新する
-func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInput) (*model.UpdateTodoOutput, error) {
+func (h *Handler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInput) (*model.UpdateTodoOutput, error) {
 	_, err := h.queries.GetTodo(ctx, input.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -167,7 +167,7 @@ func (h *TodoHandler) UpdateTodo(ctx context.Context, input *model.UpdateTodoInp
 }
 
 // DeleteTodo は指定されたIDのTodoを削除する
-func (h *TodoHandler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInput) (*model.DeleteTodoOutput, error) {
+func (h *Handler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInput) (*model.DeleteTodoOutput, error) {
 	_, err := h.queries.GetTodo(ctx, input.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -203,7 +203,7 @@ func (h *TodoHandler) DeleteTodo(ctx context.Context, input *model.DeleteTodoInp
 }
 
 // ToggleTodo は指定されたIDのTodoの完了状態を切り替える
-func (h *TodoHandler) ToggleTodo(ctx context.Context, input *model.ToggleTodoInput) (*model.ToggleTodoOutput, error) {
+func (h *Handler) ToggleTodo(ctx context.Context, input *model.ToggleTodoInput) (*model.ToggleTodoOutput, error) {
 	_, err := h.queries.GetTodo(ctx, input.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
